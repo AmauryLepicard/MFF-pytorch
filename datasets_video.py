@@ -4,7 +4,7 @@ import torchvision
 import torchvision.datasets as datasets
 
 
-ROOT_DATASET= '/usr/home/kop/MFF-pytorch'
+ROOT_DATASET= '.'
 
 def return_jester(modality):
     filename_categories = 'jester/category.txt'
@@ -16,6 +16,21 @@ def return_jester(modality):
     elif modality == 'RGBFlow':
         prefix = '{:05d}.jpg'
         root_data = '/usr/home/kop/MFF-pytorch/datasets/jester'
+    else:
+        print('no such modality:'+modality)
+        os.exit()
+    return filename_categories, filename_imglist_train, filename_imglist_val, root_data, prefix
+
+def return_emmanuelle(modality):
+    filename_categories = './category.txt'
+    filename_imglist_train = './train_videofolder.txt'
+    filename_imglist_val = './val_videofolder.txt'
+    if modality == 'RGB':
+        prefix = '{:05d}.jpg'
+        root_data = '../../data/emmanuelle2'
+    elif modality == 'RGBFlow':
+        prefix = '{:05d}.jpg'
+        root_data = '../../data/emmanuelle2'
     else:
         print('no such modality:'+modality)
         os.exit()
@@ -53,7 +68,7 @@ def return_chalearn(modality):
     return filename_categories, filename_imglist_train, filename_imglist_val, root_data, prefix
 
 def return_dataset(dataset, modality):
-    dict_single = {'jester':return_jester, 'nvgesture': return_nvgesture, 'chalearn': return_chalearn}
+    dict_single = {'jester':return_jester, 'nvgesture': return_nvgesture, 'chalearn': return_chalearn, 'emmanuelle': return_emmanuelle}
     if dataset in dict_single:
         file_categories, file_imglist_train, file_imglist_val, root_data, prefix = dict_single[dataset](modality)
     else:

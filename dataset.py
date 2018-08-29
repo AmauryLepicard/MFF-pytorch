@@ -48,14 +48,19 @@ class TSNDataSet(data.Dataset):
         self._parse_list()
 
     def _load_image(self, directory, idx, isLast=False):
+        fileList = os.listdir(os.path.join(self.root_path, "rgb", directory))
         if self.modality == 'RGB' or self.modality == 'RGBDiff':
+            fileName = fileList[idx]
+
             try:
-                return [Image.open(os.path.join(self.root_path, directory, self.image_tmpl.format(idx))).convert('RGB')]
+                return [Image.open(os.path.join(self.root_path, directory, fileName)).convert('RGB')]
             except Exception:
-                print('error loading image:', os.path.join(self.root_path, directory, self.image_tmpl.format(idx)))
+                print('error loading image:', os.path.join(self.root_path, directory, fileName))
                 return [Image.open(os.path.join(self.root_path, directory, self.image_tmpl.format(1))).convert('RGB')]
             
         elif self.modality == 'Flow':
+            fileName = fileList[idx]
+
             try:
                 idx_skip = 1 + (idx-1)*5
                 flow = Image.open(os.path.join(self.root_path, directory, self.image_tmpl.format(idx_skip))).convert('RGB')
@@ -69,11 +74,13 @@ class TSNDataSet(data.Dataset):
             return [x_img, y_img]
 
         elif self.modality == 'RGBFlow':
+            fileName = fileList[idx-1]
+
             if isLast:
-                return [Image.open(os.path.join(self.root_path, "rgb", directory, self.image_tmpl.format(idx))).convert('RGB')]
+                return [Image.open(os.path.join(self.root_path, "rgb", directory, fileName)).convert('RGB')]
             else:
-                x_img = Image.open(os.path.join(self.root_path, "flow/u", directory, self.image_tmpl.format(idx))).convert('L')
-                y_img = Image.open(os.path.join(self.root_path, "flow/v", directory, self.image_tmpl.format(idx))).convert('L')
+                x_img = Image.open(os.path.join(self.root_path, "flow/u", directory, fileName)).convert('L')
+                y_img = Image.open(os.path.join(self.root_path, "flow/v", directory, fileName)).convert('L')
                 return [x_img, y_img]
 
 
@@ -82,8 +89,8 @@ class TSNDataSet(data.Dataset):
         # usualy it is [video_id, num_frames, class_idx]
         tmp = [x.strip().split(' ') for x in open(self.list_file)]
         tmp = [item for item in tmp if int(item[1])>=3]
+
         self.video_list = [VideoRecord(item) for item in tmp]
-        print('video number:%d'%(len(self.video_list)))
 
     def _sample_indices(self, record):
         """
@@ -118,9 +125,8 @@ class TSNDataSet(data.Dataset):
         record = self.video_list[index]
         # check this is a legit video folder
         if self.modality == 'RGBFlow':
-            while not os.path.exists(os.path.join(self.root_path, "rgb", record.path, self.image_tmpl.format(1))):
-                index = np.random.randint(len(self.video_list))
-                record = self.video_list[index]
+            index = np.random.randint(len(self.video_list))
+            record = self.video_list[index]
         else:
             while not os.path.exists(os.path.join(self.root_path, record.path, self.image_tmpl.format(1))):
                 index = np.random.randint(len(self.video_list))

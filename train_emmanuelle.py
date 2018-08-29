@@ -12,15 +12,14 @@ from ops import ConsensusModule
 import datasets_video
 import pdb
 from torch.nn import functional as F
-import MLPmodule
 
+
+#  --arch BNInception --consensus_type MLP --test_crops 1 --num_motion 3 --test_segments 8
 if __name__ == '__main__':
 
     # options
     parser = argparse.ArgumentParser(
         description="MFF testing on the full validation set")
-    parser.add_argument('dataset', type=str, choices=['jester', 'nvgesture', 'chalearn', 'emmanuelle'])
-    parser.add_argument('modality', type=str, choices=['RGB', 'Flow', 'RGBDiff', 'RGBFlow'])
     parser.add_argument('weights', type=str)
     parser.add_argument('--arch', type=str, default="resnet101")
     parser.add_argument('--save_scores', type=str, default=None)
@@ -70,23 +69,24 @@ if __name__ == '__main__':
         return res
 
 
-    categories, args.train_list, args.val_list, args.root_path, prefix = datasets_video.return_dataset(args.dataset, args.modality)
+    categories, args.train_list, args.val_list, args.root_path, prefix = datasets_video.return_dataset("emmanuelle", "RGBFlow")
     num_class = len(categories)
 
-    originalNet = TSN(27, args.test_segments if args.consensus_type in ['MLP'] else 1, args.modality,
+    originalNet = TSN(27, args.test_segments if args.consensus_type in ['MLP'] else 1, "RGBFlow",
                       base_model=args.arch,
                       consensus_type=args.consensus_type,
                       img_feature_dim=args.img_feature_dim,
                       )
 
     torch.save(originalNet, "emmanuelle.pth")
+    emmanuelleNet = originalNet.base_model
 
     print("-----------------------------------------------------------------------------------------------------------------")
-    print("originalNet.base_model:", type(originalNet.base_model))
-    print("Children:", len(list(originalNet.base_model.named_children())))
-    for name, child in originalNet.base_model.named_children():
+    # print("Emmanuelle Net:", type(emmanuelleNet))
+    print("Children:", len(list(emmanuelleNet.named_children())))
+    for name, child in emmanuelleNet.named_children():
         print("    ", name.ljust(30), ":", child)
-    for op in originalNet.base_model._op_list:
+    for op in emmanuelleNet._op_list:
         #print("ID:", op[0].ljust(36),#  "Op:", op[1].ljust(12), "Out:", op[2].ljust(36), "In:", op[3])
         print(op[2].ljust(36), "<", op[1].ljust(12), "<", op[3])
     print("-----------------------------------------------------------------------------------------------------------------")
@@ -94,11 +94,15 @@ if __name__ == '__main__':
     checkpoint = torch.load(args.weights)
     print("model epoch {} best prec@1: {}".format(checkpoint['epoch'], checkpoint['best_prec1']))
 
-    base_dict = {'.'.join(k.split('.')[2:]): v for k,v in list(checkpoint['state_dict'].items())[:-6]}
-    originalNet.base_model.load_state_dict(base_dict)
-    exit()
+    base_dict = {'.'.join(k.split('.')[1:]): v for k,v in list(checkpoint['state_dict'].items())}
+    originalNet.load_state_dict(base_dict)
 
-    # finetune
+    emmanuelleDict = {'.'.join(k.split('.')[2:]): v for k,v in list(checkpoint['state_dict'].items())[:-6]}
+    # print("Emmanuelle dict", len(emmanuelleDict))
+    # for k, v in emmanuelleDict.items():
+    #     print(k.ljust(50), ":", v.shape)
+
+    emmanuelleNet.load_state_dict(emmanuelleDict)
 
     if args.test_crops == 1:
         cropping = torchvision.transforms.Compose([
@@ -114,24 +118,25 @@ if __name__ == '__main__':
         raise ValueError("Only 1 and 10 crops are supported while we got {}".format(args.test_crops))
 
     ############ Data Loading Part #####
-    if args.modality == 'RGB':
+    if "RGBFlow" == 'RGB':
         data_length = 1
-    elif args.modality in ['Flow', 'RGBDiff']:
+    elif "RGBFlow" in ['Flow', 'RGBDiff']:
         data_length = 5
-    elif args.modality == 'RGBFlow':
+    elif "RGBFlow" == 'RGBFlow':
         data_length = args.num_motion
+
 
     data_loader = torch.utils.data.DataLoader(
             TSNDataSet(args.root_path, args.val_list, num_segments=args.test_segments,
                        new_length=data_length,
-                       modality=args.modality,
+                       modality="RGBFlow",
                        image_tmpl=prefix,
-                       dataset=args.dataset,
+                       dataset="emmanuelle",
                        test_mode=True,
                        transform=torchvision.transforms.Compose([
                            cropping,
                            Stack(roll=(args.arch in
-                                       ['BNInception','InceptionV3']), isRGBFlow=(args.modality == 'RGBFlow')),
+                                       ['BNInception','InceptionV3']), isRGBFlow=("RGBFlow" == 'RGBFlow')),
                            ToTorchFormatTensor(div=(args.arch not in ['BNInception','InceptionV3'])),
                            GroupNormalize(originalNet.input_mean, originalNet.input_std),
                        ])),
@@ -147,6 +152,7 @@ if __name__ == '__main__':
     originalNet = torch.nn.DataParallel(originalNet.cuda())
     originalNet.eval()
 
+    exit()
     data_gen = enumerate(data_loader)
 
     total_num = len(data_loader.dataset)
@@ -156,16 +162,16 @@ if __name__ == '__main__':
         i, data, label = video_data
         num_crop = args.test_crops
 
-        if args.modality == 'RGB':
+        if "RGBFlow" == 'RGB':
             length = 3
-        elif args.modality == 'Flow':
+        elif "RGBFlow" == 'Flow':
             length = 10
-        elif args.modality == 'RGBDiff':
+        elif "RGBFlow" == 'RGBDiff':
             length = 18
-        elif args.modality == 'RGBFlow':
+        elif "RGBFlow" == 'RGBFlow':
             length = 3 + 2 * args.num_motion # 3 rgb channels and 3*2=6 flow channels
         else:
-            raise ValueError("Unknown modality "+args.modality)
+            raise ValueError("Unknown modality "+"RGBFlow")
 
         input_var = torch.autograd.Variable(data.view(-1, length, data.size(2), data.size(3)),
                                             volatile=True)

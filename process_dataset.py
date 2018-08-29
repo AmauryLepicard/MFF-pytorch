@@ -13,8 +13,10 @@
 
 import os
 import pdb
-dataset_name = 'jester-v1'
-with open('%s-labels.csv'% dataset_name) as f:
+
+dataFolder = '../../data'
+dataset_name = 'jester'
+with open(os.path.join(dataFolder, dataset_name)+'/labels.csv') as f:
     lines = f.readlines()
 categories = []
 for line in lines:
@@ -28,9 +30,10 @@ dict_categories = {}
 for i, category in enumerate(categories):
     dict_categories[category] = i
 
-files_input = ['%s-validation.csv'%dataset_name,'%s-train.csv'%dataset_name]
-files_output = ['val_videofolder.txt','train_videofolder.txt']
+files_input = [os.path.join(dataFolder, dataset_name)+'/validation.csv', os.path.join(dataFolder, dataset_name)+'/train.csv']
+files_output = ['val_videofolder.txt', 'train_videofolder.txt']
 for (filename_input, filename_output) in zip(files_input, files_output):
+    print(filename_input, filename_output)
     with open(filename_input) as f:
         lines = f.readlines()
     folders = []
@@ -39,14 +42,15 @@ for (filename_input, filename_output) in zip(files_input, files_output):
         line = line.rstrip()
         items = line.split(';')
         folders.append(items[0])
-        idx_categories.append(os.path.join(dict_categories[items[1]]))
+        idx_categories.append(dict_categories[items[1]])
+    print(len(idx_categories), len(folders))
     output = []
     for i in range(len(folders)):
         curFolder = folders[i]
         curIDX = idx_categories[i]
         # counting the number of frames in each video folders
-        dir_files = os.listdir(os.path.join('20bn-%s'%dataset_name, curFolder))
-        output.append('%s %d %d'%(curFolder, len(dir_files), curIDX))
-        print('%d/%d'%(i, len(folders)))
+        dir_files = os.listdir(os.path.join(dataFolder, dataset_name, curFolder))
+        output.append('%s %d %d' % (curFolder, len(dir_files), curIDX))
+        print('%d/%d' % (i, len(folders)))
     with open(filename_output,'w') as f:
         f.write('\n'.join(output))
